@@ -1,0 +1,33 @@
+{
+  "name": "autonode",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AutoNode — AI-powered Customer Acquisition Platform",
+  "packageManager": "pnpm@9.7.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "db:generate": "pnpm --filter @autonode/database generate",
+    "db:migrate": "pnpm --filter @autonode/database migrate",
+    "db:push": "pnpm --filter @autonode/database push",
+    "db:seed": "pnpm --filter @autonode/database seed",
+    "db:studio": "pnpm --filter @autonode/database studio",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "stack:up": "docker compose up -d && pnpm db:generate && pnpm db:push && pnpm db:seed",
+    "start:all": "docker compose up -d && pnpm dev"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.9",
+    "typescript": "^5.5.4",
+    "prettier": "^3.3.3",
+    "@types/node": "^20.14.12"
+  }
+}

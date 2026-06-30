@@ -1,0 +1,106 @@
+# AutoNode — production stack behind Caddy (automatic HTTPS), one domain.
+#   1. Point DNS A record for $DOMAIN at this server.
+#   2. cp .env.production.example .env  and fill in real secrets + DOMAIN.
+#   3. docker compose -f docker-compose.prod.yml up -d --build
+#   4. One-time: docker compose -f docker-compose.prod.yml exec api node apps/api/node_modules/.bin/prisma migrate deploy --schema packages/database/prisma/schema.prisma
+#
+# Postgres/Redis are NOT published to the host — only reachable on the internal
+# network. Caddy is the only service exposing ports (80/443).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-autonode}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a strong POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-autonode}
+    volumes:
+      - autonode_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-autonode} -d ${POSTGRES_DB:-autonode}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - autonode_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment:
+      NODE_ENV: production
+      API_PORT: 4000
+      API_GLOBAL_PREFIX: api/v1
+      CORS_ORIGIN: https://${DOMAIN}
+      APP_URL: https://${DOMAIN}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-autonode}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-autonode}?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY (base64 32 bytes)}
+      META_APP_ID: ${META_APP_ID:-}
+      META_APP_SECRET: ${META_APP_SECRET:-}
+      META_VERIFY_TOKEN: ${META_VERIFY_TOKEN:-autonode-verify-token}
+      META_GRAPH_VERSION: ${META_GRAPH_VERSION:-v21.0}
+      META_OAUTH_REDIRECT_URI: https://${DOMAIN}/api/v1/integrations/meta/oauth/callback
+      INSTAGRAM_APP_ID: ${INSTAGRAM_APP_ID:-}
+      INSTAGRAM_APP_SECRET: ${INSTAGRAM_APP_SECRET:-}
+      AI_PROVIDER: ${AI_PROVIDER:-anthropic}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-4-8}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:4000/api/v1/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Baked into the client bundle at build time — must be the public HTTPS URLs.
+        NEXT_PUBLIC_API_URL: https://${DOMAIN}/api/v1
+        NEXT_PUBLIC_WS_URL: wss://${DOMAIN}
+    restart: unless-stopped
+    depends_on:
+      api: { condition: service_healthy }
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [web, api]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - autonode_caddy_data:/data
+      - autonode_caddy_config:/config
+
+volumes:
+  autonode_pg:
+  autonode_redis:
+  autonode_caddy_data:
+  autonode_caddy_config:

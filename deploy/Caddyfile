@@ -1,0 +1,16 @@
+# AutoNode production reverse proxy with automatic HTTPS (Let's Encrypt).
+# {$DOMAIN} and {$ACME_EMAIL} are read from the environment (set in .env).
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	# API + realtime go to the NestJS service; everything else to Next.js.
+	@backend path /api/* /socket.io/*
+	reverse_proxy @backend api:4000
+	reverse_proxy web:3000
+
+	encode gzip
+	header -Server
+}

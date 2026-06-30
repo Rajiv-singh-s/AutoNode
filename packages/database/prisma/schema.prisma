@@ -1,0 +1,568 @@
+// AutoNode — Prisma schema
+// Multi-tenant AI Customer Acquisition Platform.
+// Tenancy: every business-domain row carries organizationId.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum ActivityType {
+  INBOUND_MESSAGE
+  OUTBOUND_MESSAGE
+  INTERNAL_NOTE
+  STAGE_CHANGED
+  SCORE_CHANGED
+  VALUE_CHANGED
+  TAGS_UPDATED
+  AUTOMATION_ACTION
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Activity {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  type           ActivityType
+  title          String
+  body           String?  @db.Text
+  conversationId String?
+  messageId      String?
+  userId         String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([contactId, createdAt])
+  @@index([conversationId, createdAt])
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MANAGER
+  SALES
+  SUPPORT
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+enum ChannelType {
+  INSTAGRAM
+  MESSENGER
+  WHATSAPP
+}
+
+enum ChannelStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+  EXPIRED
+}
+
+enum ConversationStatus {
+  OPEN
+  PENDING
+  RESOLVED
+  ARCHIVED
+  SPAM
+}
+
+enum ConversationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  FILE
+  STORY_REPLY
+  COMMENT
+  TEMPLATE
+  SYSTEM
+}
+
+enum MessageDeliveryStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum SenderType {
+  CONTACT
+  AGENT
+  AI
+  SYSTEM
+}
+
+enum Sentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+}
+
+enum BuyingIntent {
+  NONE
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum LeadStage {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum WebhookEventStatus {
+  RECEIVED
+  PROCESSING
+  PROCESSED
+  FAILED
+  SKIPPED
+}
+
+enum AutomationTrigger {
+  COMMENT_KEYWORD
+  DM_KEYWORD
+  STORY_REPLY
+  NEW_CONVERSATION
+}
+
+// ──────────────────────── Identity & Tenancy ─────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  avatarUrl     String?
+  passwordHash  String? // null for OAuth-only users
+  emailVerified DateTime?
+  googleId      String?  @unique
+  lastLoginAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  memberships   Membership[]
+  sentInvites   Invitation[]    @relation("InvitedBy")
+  refreshTokens RefreshToken[]
+  assignedConvos Conversation[] @relation("AssignedAgent")
+  notes         InternalNote[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+
+  @@index([email])
+}
+
+model RefreshToken {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String   @unique
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  userAgent   String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  logoUrl     String?
+  plan        String   @default("free")
+  // Stripe billing
+  stripeCustomerId     String? @unique
+  stripeSubscriptionId String? @unique
+  trialEndsAt          DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime? // soft delete
+
+  memberships   Membership[]
+  invitations   Invitation[]
+  channels      Channel[]
+  conversations Conversation[]
+  activities    Activity[]
+  contacts      Contact[]
+  messages      Message[]
+  webhookEvents WebhookEvent[]
+  automations   Automation[]
+  auditLogs     AuditLog[]
+  labels        Label[]
+  internalNotes InternalNote[]
+  notifications Notification[]
+  billingEvents  BillingEvent[]
+
+  @@index([slug])
+}
+
+model Membership {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role           OrgRole  @default(SALES)
+  createdAt      DateTime @default(now())
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+}
+
+model Invitation {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  role           OrgRole  @default(SALES)
+  token          String   @unique
+  status         InviteStatus @default(PENDING)
+  invitedById    String
+  invitedBy      User     @relation("InvitedBy", fields: [invitedById], references: [id])
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+
+  @@unique([organizationId, email])
+  @@index([token])
+}
+
+// ──────────────────────── Meta integration ───────────────────────
+
+// A connected Meta surface (an IG business account, FB page, or WA number).
+model Channel {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  type           ChannelType
+  status         ChannelStatus @default(CONNECTED)
+  // External identifiers from Meta Graph
+  externalId     String // IG user id / FB page id / WABA phone number id
+  name           String?
+  username       String?
+  avatarUrl      String?
+  // Encrypted (AES-256-GCM) Meta access token + metadata. Never stored in plaintext.
+  accessTokenEnc String?  @db.Text
+  tokenExpiresAt DateTime?
+  // WhatsApp specific
+  wabaId         String?
+  phoneNumberId  String?
+  // Page <-> IG linkage for Messenger/Instagram
+  pageId         String?
+  lastSyncedAt   DateTime?
+  lastError      String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  conversations Conversation[]
+  contacts      Contact[]
+  automations   Automation[]
+
+  @@unique([organizationId, type, externalId])
+  @@index([externalId])
+}
+
+// Raw inbound webhook payloads — append-only audit + idempotent processing.
+model WebhookEvent {
+  id             String   @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  source         ChannelType
+  // Meta delivers an event id we use for idempotency where available.
+  dedupeKey      String?  @unique
+  signatureValid Boolean  @default(false)
+  status         WebhookEventStatus @default(RECEIVED)
+  payload        Json
+  error          String?  @db.Text
+  attempts       Int      @default(0)
+  receivedAt     DateTime @default(now())
+  processedAt    DateTime?
+
+  @@index([organizationId, status])
+  @@index([receivedAt])
+}
+
+// ──────────────────────── Contacts / Leads / CRM ─────────────────
+
+model Contact {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channelId      String?
+  channel        Channel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  // External (per-channel) sender id, e.g. IGSID / PSID / WA phone
+  externalId     String
+  name           String?
+  username       String?
+  avatarUrl      String?
+  phone          String?
+  email          String?
+  // Lead/CRM
+  leadStage      LeadStage @default(NEW)
+  leadScore      Int      @default(0) // 0-100, AI-derived
+  leadValue      Decimal? @db.Decimal(12, 2)
+  source         String? // e.g. "instagram_dm", "ad:<adId>"
+  // AI customer profile (generated)
+  aiProfile      Json?
+  tags           String[] @default([])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  conversations Conversation[]
+  activities    Activity[]
+
+  @@unique([organizationId, channelId, externalId])
+  @@index([organizationId, leadStage])
+  @@index([organizationId, leadScore])
+}
+
+// ──────────────────────── Inbox ──────────────────────────────────
+
+model Conversation {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channelId      String
+  channel        Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  // Meta thread identifier (conversation id / thread id)
+  externalThreadId String?
+  status         ConversationStatus @default(OPEN)
+  priority       ConversationPriority @default(MEDIUM)
+  // assignment
+  assignedAgentId String?
+  assignedAgent   User?    @relation("AssignedAgent", fields: [assignedAgentId], references: [id], onDelete: SetNull)
+  isPinned       Boolean  @default(false)
+  unreadCount    Int      @default(0)
+  lastMessageAt  DateTime?
+  lastMessagePreview String? @db.Text
+  // AI-derived signals
+  aiSummary      String?  @db.Text
+  sentiment      Sentiment?
+  buyingIntent   BuyingIntent @default(NONE)
+  priorityScore  Int      @default(0) // 0-100
+  isSpam         Boolean  @default(false)
+  language       String?
+  aiSuggestedReplies String[] @default([])
+  // ads attribution
+  adId           String?
+  adSetId        String?
+  campaignId     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  messages      Message[]
+  labels        ConversationLabel[]
+  internalNotes InternalNote[]
+
+  @@index([organizationId, status, lastMessageAt])
+  @@index([organizationId, assignedAgentId])
+  @@index([channelId])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  // External message id from Meta (idempotency)
+  externalId     String?
+  direction      MessageDirection
+  senderType     SenderType
+  type           MessageType @default(TEXT)
+  text           String?  @db.Text
+  attachments    Json? // [{ type, url, mimeType }]
+  deliveryStatus MessageDeliveryStatus @default(SENT)
+  // who sent it, if an agent
+  sentByUserId   String?
+  // AI generation marker
+  aiGenerated    Boolean  @default(false)
+  error          String?  @db.Text
+  sentAt         DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  @@unique([conversationId, externalId])
+  @@index([conversationId, sentAt])
+  @@index([organizationId])
+}
+
+model Label {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  color          String   @default("#6366f1")
+  createdAt      DateTime @default(now())
+
+  conversations ConversationLabel[]
+
+  @@unique([organizationId, name])
+}
+
+model ConversationLabel {
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  labelId        String
+  label          Label    @relation(fields: [labelId], references: [id], onDelete: Cascade)
+  assignedAt     DateTime @default(now())
+
+  @@id([conversationId, labelId])
+}
+
+model InternalNote {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  authorId       String
+  author         User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body           String   @db.Text
+  createdAt      DateTime @default(now())
+
+  @@index([conversationId])
+}
+
+// ──────────────────────── Automation engine ──────────────────────
+
+model Automation {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channelId      String?
+  channel        Channel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  name           String
+  enabled        Boolean  @default(true)
+  trigger        AutomationTrigger
+  // matching config, e.g. { keywords: ["price","buy"], matchType: "any" }
+  conditions     Json
+  // ordered steps, e.g. [{ type: "send_dm", text }, { type: "delay", seconds }]
+  actions        Json
+  runCount       Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  runs AutomationRun[]
+
+  @@index([organizationId, enabled])
+}
+
+model AutomationRun {
+  id            String   @id @default(cuid())
+  automationId  String
+  automation    Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  conversationId String?
+  status        WebhookEventStatus @default(PROCESSING)
+  log           Json?
+  error         String?  @db.Text
+  startedAt     DateTime @default(now())
+  finishedAt    DateTime?
+
+  @@index([automationId, startedAt])
+}
+
+// ──────────────────────── Notifications ─────────────────────────
+
+enum NotificationType {
+  NEW_HOT_LEAD
+  AUTOMATION_TRIGGERED
+  CONVERSATION_ASSIGNED
+  NEW_CONVERSATION
+  CHANNEL_ERROR
+  TEAM_INVITE
+}
+
+model Notification {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           NotificationType
+  title          String
+  body           String?
+  // Deep link target (e.g. /inbox?conversation=xxx)
+  actionUrl      String?
+  read           Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+
+  @@index([userId, read, createdAt])
+  @@index([organizationId, createdAt])
+}
+
+model BillingEvent {
+  id               String   @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stripeEventId    String?  @unique
+  stripeCustomerId String?
+  stripeSubscriptionId String?
+  stripeInvoiceId  String?
+  type             String
+  status           String?
+  plan             String?
+  amount           Decimal? @db.Decimal(12, 2)
+  currency         String?
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  payload          Json?
+  createdAt        DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, type])
+}
+
+// ──────────────────────── Observability ──────────────────────────
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  actorId        String?
+  actor          User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action         String // e.g. "channel.connected", "conversation.assigned"
+  targetType     String?
+  targetId       String?
+  metadata       Json?
+  ipAddress      String?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+}
