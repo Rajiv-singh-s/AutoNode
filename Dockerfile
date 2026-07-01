@@ -42,7 +42,8 @@ COPY --from=builder /app .
 
 ENV NODE_ENV=production
 
-# Railway injects PORT at runtime; expose that same port so Railway's health probe finds the server
-EXPOSE ${PORT:-8080}
+# Railway scans for EXPOSE to know where to route traffic.
+# It doesn't always parse bash variable expansion correctly.
+EXPOSE 8080
 
 CMD ["node", "apps/api/dist/main.js"]
