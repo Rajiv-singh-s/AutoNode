@@ -29,11 +29,14 @@ import { HealthController } from './health/health.controller';
 
 function redisConnectionFromUrl(url: string) {
   const u = new URL(url);
+  const isUpstash = u.hostname.includes('upstash.io');
   return {
     host: u.hostname,
     port: Number(u.port || 6379),
     ...(u.password ? { password: u.password } : {}),
     ...(u.username ? { username: u.username } : {}),
+    ...(u.protocol === 'rediss:' || isUpstash ? { tls: {} } : {}),
+    family: 0,
   };
 }
 

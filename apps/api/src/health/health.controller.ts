@@ -37,11 +37,14 @@ export class HealthController {
     try {
       const redisUrl = this.config.get<string>('REDIS_URL', 'redis://localhost:6379');
       const u = new URL(redisUrl);
+      const isUpstash = u.hostname.includes('upstash.io');
       const connection = {
         host: u.hostname,
         port: Number(u.port || 6379),
         ...(u.password ? { password: u.password } : {}),
         ...(u.username ? { username: u.username } : {}),
+        ...(u.protocol === 'rediss:' || isUpstash ? { tls: {} } : {}),
+        family: 0,
       };
 
       const webhookQueue = new Queue(QUEUES.WEBHOOK, { connection });
