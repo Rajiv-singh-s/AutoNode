@@ -1,6 +1,5 @@
 [build]
 builder = "nixpacks"
-buildCommand = "pnpm turbo run build --filter=@autonode/api..."
 
 [deploy]
 startCommand = "node apps/api/dist/main.js"

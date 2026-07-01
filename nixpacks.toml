@@ -1,0 +1,9 @@
+[phases.setup]
+aptPkgs = ["openssl"]
+
+[phases.build]
+cmds = [
+  "pnpm install --frozen-lockfile",
+  "pnpm --filter @autonode/database generate",
+  "pnpm turbo run build --filter=@autonode/api..."
+]
