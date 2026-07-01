@@ -42,6 +42,7 @@ COPY --from=builder /app .
 
 ENV NODE_ENV=production
 
-EXPOSE 4000
+# Railway injects PORT at runtime; expose that same port so Railway's health probe finds the server
+EXPOSE ${PORT:-8080}
 
 CMD ["node", "apps/api/dist/main.js"]
