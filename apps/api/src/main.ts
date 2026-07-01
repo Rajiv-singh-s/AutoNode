@@ -40,8 +40,8 @@ async function bootstrap(): Promise<void> {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup(`${prefix}/docs`, app, document);
 
-  const port = Number(process.env.API_PORT ?? 4000);
-  await app.listen(port);
+  const port = Number(process.env.PORT ?? process.env.API_PORT ?? 4000);
+  await app.listen(port, '0.0.0.0');
   new Logger('Bootstrap').log(
     `AutoNode API listening on http://localhost:${port}/${prefix} (docs at /${prefix}/docs)`,
   );
