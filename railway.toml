@@ -1,0 +1,6 @@
+[build]
+builder = "nixpacks"
+buildCommand = "pnpm turbo run build --filter=@autonode/api..."
+
+[deploy]
+startCommand = "pnpm --filter @autonode/api start:prod"
