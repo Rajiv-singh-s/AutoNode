@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
-import { Sparkles, Moon, Sun, Menu, X } from 'lucide-react';
+import { Moon, Sun, Menu, X } from 'lucide-react';
 import { authStore } from '@/lib/auth';
 import { cn } from '@/lib/utils';
+import { LogoMark } from '@/components/Logo';
 
 const links = [
   { href: '/features', label: 'Features' },
@@ -29,11 +30,8 @@ export function MarketingNav() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Sparkles className="h-4 w-4" />
-          </div>
-          <span className="text-base font-semibold tracking-tight">AutoNode</span>
+        <Link href="/" className="flex items-center">
+          <LogoMark className="h-11 w-11" />
         </Link>
 
         <nav className="hidden items-center gap-6 md:flex">

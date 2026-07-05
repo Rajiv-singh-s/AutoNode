@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui';
+import { LogoMark } from '@/components/Logo';
 import { authApi, ApiError } from '@/lib/api';
 import { authStore } from '@/lib/auth';
 
@@ -44,14 +44,8 @@ export default function LoginPage() {
         transition={{ duration: 0.4 }}
         className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-xl"
       >
-        <div className="mb-6 flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Sparkles className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-base font-semibold">AutoNode</h1>
-            <p className="text-xs text-muted-foreground">AI Sales Operating System</p>
-          </div>
+        <div className="mb-6 flex justify-center">
+          <LogoMark className="h-28 w-28" />
         </div>
 
         <form onSubmit={submit} className="space-y-3">

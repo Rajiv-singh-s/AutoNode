@@ -10,7 +10,6 @@ import {
   Users,
   KanbanSquare,
   Workflow,
-  Sparkles,
   Moon,
   Sun,
   LogOut,
@@ -18,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn, initials } from '@/lib/utils';
 import { authStore } from '@/lib/auth';
+import { LogoMark } from '@/components/Logo';
 import { NotificationBell } from './NotificationBell';
 
 const nav = [
@@ -45,14 +45,9 @@ export function Sidebar() {
   return (
     <aside className="flex h-full w-60 shrink-0 flex-col border-r border-border bg-card">
       {/* Brand */}
-      <div className="flex items-center gap-2 px-4 py-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <Sparkles className="h-4 w-4" />
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">AutoNode</p>
-          <p className="truncate text-xs text-muted-foreground">{org?.name ?? 'Workspace'}</p>
-        </div>
+      <div className="flex items-center gap-2.5 px-4 py-4">
+        <LogoMark className="h-11 w-11" />
+        <p className="min-w-0 truncate text-sm text-muted-foreground">{org?.name ?? 'Workspace'}</p>
       </div>
 
       {/* Nav */}

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Sparkles } from 'lucide-react';
+import { LogoMark } from '@/components/Logo';
 
 const columns = [
   {
@@ -26,6 +26,7 @@ const columns = [
       { href: '/privacy', label: 'Privacy Policy' },
       { href: '/terms', label: 'Terms of Service' },
       { href: '/cookies', label: 'Cookie Policy' },
+      { href: '/data-deletion', label: 'Data Deletion' },
     ],
   },
 ];
@@ -35,11 +36,8 @@ export function Footer() {
     <footer className="border-t border-border bg-card">
       <div className="mx-auto grid max-w-6xl gap-8 px-6 py-12 sm:grid-cols-2 md:grid-cols-4">
         <div>
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Sparkles className="h-3.5 w-3.5" />
-            </div>
-            <span className="font-semibold">AutoNode</span>
+          <Link href="/" className="inline-flex items-center">
+            <LogoMark className="h-12 w-12" />
           </Link>
           <p className="mt-3 max-w-xs text-sm text-muted-foreground">
             The AI Sales Operating System for Instagram, Messenger & WhatsApp.

@@ -1,12 +1,11 @@
 import Link from 'next/link';
-import { Sparkles, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
+import { LogoMark } from '@/components/Logo';
 
 export default function NotFound() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-        <Sparkles className="h-6 w-6" />
-      </div>
+      <LogoMark className="h-24 w-24" />
       <p className="mt-6 text-6xl font-bold tracking-tight">404</p>
       <h1 className="mt-2 text-xl font-semibold">Page not found</h1>
       <p className="mt-2 max-w-sm text-sm text-muted-foreground">
